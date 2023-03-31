@@ -1,7 +1,7 @@
 //!  Entity System for bimber ecs, manges thing like adding, deleting and quering entities.
-mod query;
+pub mod query;
 
-use std::{collections::HashMap, any::{TypeId, Any}};
+use std::{collections::HashMap, any::{TypeId, Any}, fmt::Debug};
 use std::sync::{Mutex, Arc};
 
 use self::query::{SingleQuery, SingleMutQuery, DoubleMutQuery};
@@ -68,21 +68,38 @@ impl EntitySystem {
         self
     }
 
+    pub fn try_clear_query_with_one<T: Any + Debug>(&mut self) -> Result<(), &'static str> {
+        if let Some(query) = self.queris.remove(&TypeId::of::<T>()) {
+            let query = query.downcast::<Arc<SingleQuery<T>>>().unwrap();
+
+            if Arc::strong_count(&query) > 1 {
+                return Err("There are still active queris");
+            }
+        }
+
+        Ok(())
+    }
+
+    
     /// Basic quering, only on one component
-    pub fn query_with_one<'a, T: Any>(&'a mut self) -> Arc<SingleQuery<T>> {
+    pub fn query_with_one<'a, T: Any + Debug>(&'a mut self) -> Arc<SingleQuery<T>> {
          Arc::clone(self.queris.entry(TypeId::of::<T>())
-             .or_insert(Box::new(Arc::new(SingleQuery::<T>::new(self.components.lock().unwrap().remove(&TypeId::of::<T>()).expect("There's nothing in here"), Arc::clone(&self.components))))).downcast_ref::<Arc<SingleQuery<T>>>().expect("still doesn't work"))
+             .or_insert_with(|| Box::new(Arc::new(SingleQuery::<T>::new(self.components.lock().unwrap().remove(&TypeId::of::<T>()).expect("There's nothing in here"), Arc::clone(&self.components))))).downcast_ref::<Arc<SingleQuery<T>>>().expect("still doesn't work"))
     }
 
     /// Basic quering, only on one component
-    pub fn mut_query_with_one<'a, T: Any>(&'a mut self) -> Arc<SingleMutQuery<T>> {
+    pub fn mut_query_with_one<'a, T: Any + Debug>(&'a mut self) -> Arc<SingleMutQuery<T>> {
          Arc::clone(self.mut_queris.entry(TypeId::of::<T>()).or_insert(Box::new(Arc::new(SingleMutQuery::<T>::new(self.components.lock().unwrap().remove(&TypeId::of::<T>()).unwrap(), Arc::clone(&self.components))))).downcast_ref::<Arc<SingleMutQuery<T>>>().unwrap())
     }
     
     /// Basic quering, only on one component
-    pub fn mut_query_with_two<'a, T: Any, U: Any>(&'a mut self) -> Arc<DoubleMutQuery<T, U>> {
-         Arc::clone(self.mut_queris.entry(TypeId::of::<(T, U)>()).or_insert(Box::new(Arc::new(DoubleMutQuery::<T, U>::new(self.components.lock().unwrap().remove(&TypeId::of::<T>()).unwrap(), self.components.lock().unwrap().remove(&TypeId::of::<U>()).unwrap(), Arc::clone(&self.components))))).downcast_ref::<Arc<DoubleMutQuery<T, U>>>().unwrap())
+    pub fn mut_query_with_two<'a, T: Any + Debug, U: Any + Debug>(&'a mut self) -> Arc<DoubleMutQuery<T, U>> {
+        let mut components = self.components.lock().unwrap();
+         Arc::clone(self.mut_queris.entry(TypeId::of::<(T, U)>())
+                    .or_insert_with(|| {
+                        Box::new(Arc::new(DoubleMutQuery::<T, U>::new(components.remove(&TypeId::of::<T>()).unwrap(), components.remove(&TypeId::of::<U>()).unwrap(), Arc::clone(&self.components)))
 
+                                                 )}).downcast_ref::<Arc<DoubleMutQuery<T, U>>>().unwrap())
     }
 
 }
