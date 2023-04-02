@@ -1,38 +1,30 @@
-use super::{Query, make_box_any};
+use super::make_box_any;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use std::any::{Any, TypeId};
 
-#[derive(Debug)]
-pub struct SingleQuery<T: Any + Debug>
-{
-    row: Option<Vec<Option<Arc<T>>>>,
-    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Arc<Mutex<Box<dyn Any>>>>>>>>, 
+pub struct SingleQuery<T: Any + Debug> {
+    row: Option<Vec<Option<T>>>,
+    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>, 
 }
 
-impl<T: Any + Debug> Query for SingleQuery<T> 
-{
-    type QueryItem = Arc<T>;
+impl<T: Any + Debug> SingleQuery<T> {
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = Self::QueryItem> + 'a> {
-       Box::new(self.row.as_ref().unwrap().iter().filter_map(|x| x.as_ref().and_then(|y| Some(Arc::clone(y))))) 
+    pub fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &T> + 'a> {
+       Box::new(self.row.as_ref().unwrap().iter().filter_map(|x| x.as_ref())) 
     }
-}
 
-impl<T: Any + Debug> SingleQuery<T> 
-{
-     pub fn new(row: Vec<Option<Arc<Mutex<Box<dyn Any>>>>>, components: Arc<Mutex<HashMap<TypeId, Vec<Option<Arc<Mutex<Box<dyn Any>>>>>>>>) -> Self {
-        let row = Some(row.into_iter().map(|option| option.map(|arc| Arc::new(*Arc::try_unwrap(arc).unwrap().into_inner().unwrap().downcast::<T>().expect("What is going on")))).collect());
+     pub fn new(row: Vec<Option<Box<dyn Any>>>, components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>) -> Self {
+        let row = Some(row.into_iter().map(|option| option.map(|arc| *arc.downcast::<T>().expect("What is going on"))).collect());
          
         Self { row, components }
      }
 }
 
-impl<T: Any + Debug> Drop for SingleQuery<T>
-{
+impl<T: Any + Debug> Drop for SingleQuery<T> {
     fn drop(&mut self) {
-        let new_row = self.row.take().unwrap().into_iter().map(|option| option.map(|arc| Arc::new(Mutex::new(make_box_any(Arc::try_unwrap(arc).unwrap()))))).collect(); 
+        let new_row = self.row.take().unwrap().into_iter().map(|option| option.map(|arc| make_box_any(arc))).collect(); 
 
         self.components.lock().expect("ARE YOU GOOD BRO?").insert(TypeId::of::<T>(), new_row);
     }

@@ -14,9 +14,3 @@ fn make_box_any<T: Any>(t: T) -> Box<dyn Any> {
     Box::new(t)
 }
 
-pub trait Query {
-    type QueryItem;
-
-    fn iter<'a>(&'a self) -> Box<dyn Iterator< Item = Self::QueryItem> + 'a>;
-}
-

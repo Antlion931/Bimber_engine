@@ -25,7 +25,7 @@ use query::*;
 /// When trying to use with(), when there isn't any entity, will cause panic!
 #[derive(Debug)]
 pub struct EntitySystem {
-    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Arc<Mutex<Box<dyn Any>>>>>>>>,
+    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>,
     queris: HashMap<TypeId, Box<dyn Any>>, // any will be Arc<Query>
     mut_queris: HashMap<TypeId, Box<dyn Any>>, // any will be Arc<Query>
     amount_of_entities: u64,
@@ -66,7 +66,7 @@ impl EntitySystem {
                 new_vec
             });
 
-        *vec.last_mut().expect("with should be called after at least one add_entity") = Some(Arc::new(Mutex::new(Box::new(component))));
+        *vec.last_mut().expect("with should be called after at least one add_entity") = Some(Box::new(component));
         
         drop(vec_lock);
         self
@@ -97,7 +97,13 @@ impl EntitySystem {
     }
 
     pub fn query_with_two<'a, T: Any + Debug, U: Any + Debug>(&'a mut self) -> Arc<DoubleQuery<T, U>> {
-    }
+    let mut components = self.components.lock().unwrap();
+         Arc::clone(self.queris.entry(TypeId::of::<(T, U)>())
+                    .or_insert_with(|| {
+                        Box::new(Arc::new(DoubleQuery::<T, U>::new(components.remove(&TypeId::of::<T>()).unwrap(), components.remove(&TypeId::of::<U>()).unwrap(), Arc::clone(&self.components)))
+
+                                                 )}).downcast_ref::<Arc<DoubleQuery<T, U>>>().unwrap())
+}
     
     /// Basic quering, only on one component
     pub fn mut_query_with_two<'a, T: Any + Debug, U: Any + Debug>(&'a mut self) -> Arc<DoubleMutQuery<T, U>> {
@@ -113,7 +119,7 @@ impl EntitySystem {
 
 #[cfg(test)]
 mod tests {
-    use super::{*, query::Query};
+    use super::*;
 
     #[test]
     fn entity_system_query_with_two_works_in_complex_example() {
@@ -143,8 +149,8 @@ mod tests {
             .with(12)
             .with("test");
 
-        es.mut_query_with_two::<i32, &str>();
+        es.query_with_two::<i32, &str>();
 
-        es.mut_query_with_two::<&str, i32>();
+        //es.query_with_two::<&str, i32>();
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bimber_ecs::entity_system::EntitySystem;
-use bimber_ecs::entity_system::query::Query;
+use bimber_ecs::entity_system::query::*;
 
 fn main() {
     let mut es = EntitySystem::new();
