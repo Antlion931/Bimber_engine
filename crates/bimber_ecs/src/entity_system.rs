@@ -4,7 +4,7 @@ pub mod query;
 use std::{collections::HashMap, any::{TypeId, Any}, fmt::Debug};
 use std::sync::{Mutex, Arc};
 
-use self::query::{SingleQuery, SingleMutQuery, DoubleMutQuery};
+use query::*;
 
 /// EntitySystem is core struct, it handles every thing related to entites, for now usage looks
 /// like this:
@@ -60,7 +60,11 @@ impl EntitySystem {
         let mut vec_lock = self.components.lock().unwrap();
         let vec = vec_lock
             .entry(component.type_id())
-            .or_insert((0..self.amount_of_entities).map(|_| None).collect());
+            .or_insert_with(|| {
+                let mut new_vec = Vec::with_capacity(100_000);
+                new_vec = (0..self.amount_of_entities).map(|_| None).collect();
+                new_vec
+            });
 
         *vec.last_mut().expect("with should be called after at least one add_entity") = Some(Arc::new(Mutex::new(Box::new(component))));
         
@@ -90,6 +94,9 @@ impl EntitySystem {
     /// Basic quering, only on one component
     pub fn mut_query_with_one<'a, T: Any + Debug>(&'a mut self) -> Arc<SingleMutQuery<T>> {
          Arc::clone(self.mut_queris.entry(TypeId::of::<T>()).or_insert(Box::new(Arc::new(SingleMutQuery::<T>::new(self.components.lock().unwrap().remove(&TypeId::of::<T>()).unwrap(), Arc::clone(&self.components))))).downcast_ref::<Arc<SingleMutQuery<T>>>().unwrap())
+    }
+
+    pub fn query_with_two<'a, T: Any + Debug, U: Any + Debug>(&'a mut self) -> Arc<DoubleQuery<T, U>> {
     }
     
     /// Basic quering, only on one component
@@ -127,5 +134,17 @@ mod tests {
         assert_eq!(es.query_with_one::<&str>().as_ref().iter().count(), 3);
 
         assert_eq!(es.query_with_one::<i32>().as_ref().iter().count(), 2);
+    }
+
+    #[test]
+    fn entity_system_query_with_double_does_not_depend_on_order_of_types() {
+        let mut es = EntitySystem::new()
+            .add_entity()
+            .with(12)
+            .with("test");
+
+        es.mut_query_with_two::<i32, &str>();
+
+        es.mut_query_with_two::<&str, i32>();
     }
 }
