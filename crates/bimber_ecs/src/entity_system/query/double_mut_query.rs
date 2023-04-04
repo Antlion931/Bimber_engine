@@ -1,16 +1,16 @@
+use super::super::SafeType;
 use super::make_box_any;
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-pub struct DoubleMutQuery<T: Any + Debug, U: Any + Debug> {
+pub struct DoubleMutQuery<T: SafeType, U: SafeType> {
     row_t: Option<Vec<Option<T>>>,
     row_u: Option<Vec<Option<U>>>,
-    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>,
+    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn SafeType>>>>>>,
 }
 
-impl<T: Any + Debug, U: Any + Debug> DoubleMutQuery<T, U> {
+impl<T: SafeType, U: SafeType> DoubleMutQuery<T, U> {
     pub fn iter<'a>(&'a mut self) -> impl Iterator<Item = (&mut T, &mut U)> {
         self.row_t
             .as_mut()
@@ -27,9 +27,9 @@ impl<T: Any + Debug, U: Any + Debug> DoubleMutQuery<T, U> {
     }
 
     pub fn new(
-        row_t: Vec<Option<Box<dyn Any>>>,
-        row_u: Vec<Option<Box<dyn Any>>>,
-        components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>,
+        row_t: Vec<Option<Box<dyn SafeType>>>,
+        row_u: Vec<Option<Box<dyn SafeType>>>,
+        components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn SafeType>>>>>>,
     ) -> Self {
         let row_t = Some(
             row_t
@@ -52,7 +52,7 @@ impl<T: Any + Debug, U: Any + Debug> DoubleMutQuery<T, U> {
     }
 }
 
-impl<T: Any + Debug, U: Any + Debug> Drop for DoubleMutQuery<T, U> {
+impl<T: SafeType, U: SafeType> Drop for DoubleMutQuery<T, U> {
     fn drop(&mut self) {
         let new_row_t = self
             .row_t
@@ -79,3 +79,5 @@ impl<T: Any + Debug, U: Any + Debug> Drop for DoubleMutQuery<T, U> {
             .insert(TypeId::of::<U>(), new_row_u);
     }
 }
+
+unsafe impl<T: SafeType, U: SafeType> Send for DoubleMutQuery<T, U> {}

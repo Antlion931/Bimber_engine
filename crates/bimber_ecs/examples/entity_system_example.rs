@@ -12,5 +12,5 @@ fn main() {
 
     println!("HERE");
 
-    println!("{}", es.query_with_one::<i32>().count());
+    println!("{}", es.query_with_one::<i32>().as_ref().iter().count());
 }

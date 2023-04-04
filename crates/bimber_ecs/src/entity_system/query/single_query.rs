@@ -1,22 +1,23 @@
 use super::make_box_any;
-use std::any::{Any, TypeId};
+use std::any::TypeId;
 use std::collections::HashMap;
-use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 
-pub struct SingleQuery<T: Any + Debug> {
+use super::super::SafeType;
+
+pub struct SingleQuery<T: SafeType> {
     row: Option<Vec<Option<T>>>,
-    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>,
+    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn SafeType>>>>>>,
 }
 
-impl<T: Any + Debug> SingleQuery<T> {
+impl<T: SafeType> SingleQuery<T> {
     pub fn iter<'a>(&'a self) -> impl Iterator<Item = &T> {
         self.row.as_ref().unwrap().iter().filter_map(|x| x.as_ref())
     }
 
     pub fn new(
-        row: Vec<Option<Box<dyn Any>>>,
-        components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn Any>>>>>>,
+        row: Vec<Option<Box<dyn SafeType>>>,
+        components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn SafeType>>>>>>,
     ) -> Self {
         let row = Some(
             row.into_iter()
@@ -28,7 +29,7 @@ impl<T: Any + Debug> SingleQuery<T> {
     }
 }
 
-impl<T: Any + Debug> Drop for SingleQuery<T> {
+impl<T: SafeType> Drop for SingleQuery<T> {
     fn drop(&mut self) {
         let new_row = self
             .row
@@ -44,3 +45,5 @@ impl<T: Any + Debug> Drop for SingleQuery<T> {
             .insert(TypeId::of::<T>(), new_row);
     }
 }
+
+unsafe impl<T: SafeType> Send for SingleQuery<T> {}
