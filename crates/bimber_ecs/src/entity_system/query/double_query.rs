@@ -1,4 +1,4 @@
-use super::make_box_any;
+use super::{make_box_any, ID, super::ComponentRow};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -8,19 +8,20 @@ use super::super::SafeType;
 pub struct DoubleQuery<T: SafeType, U: SafeType> {
     row_t: Option<Vec<Option<T>>>,
     row_u: Option<Vec<Option<U>>>,
-    components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn SafeType>>>>>>,
+    components: Arc<Mutex<HashMap<TypeId, ComponentRow>>>,
 }
 
 impl<T: SafeType, U: SafeType> DoubleQuery<T, U> {
-    pub fn iter<'a>(&'a self) -> impl Iterator<Item = (&T, &U)> {
+    pub fn iter(&self) -> impl Iterator<Item = (ID, &T, &U)> {
         self.row_t
             .as_ref()
             .unwrap()
             .iter()
             .zip(self.row_u.as_ref().unwrap().iter())
-            .filter_map(|(t, u)| {
+            .enumerate()
+            .filter_map(|(n, (t, u))| {
                 if let (Some(t), Some(u)) = (t.as_ref(), u.as_ref()) {
-                    Some((t, u))
+                    Some((n, t, u))
                 } else {
                     None
                 }
@@ -28,9 +29,9 @@ impl<T: SafeType, U: SafeType> DoubleQuery<T, U> {
     }
 
     pub fn new(
-        row_t: Vec<Option<Box<dyn SafeType>>>,
-        row_u: Vec<Option<Box<dyn SafeType>>>,
-        components: Arc<Mutex<HashMap<TypeId, Vec<Option<Box<dyn SafeType>>>>>>,
+        row_t: ComponentRow,
+        row_u: ComponentRow,
+        components: Arc<Mutex<HashMap<TypeId, ComponentRow>>>,
     ) -> Self {
         let row_t = Some(
             row_t

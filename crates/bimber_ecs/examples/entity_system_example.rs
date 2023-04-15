@@ -10,6 +10,8 @@ fn main() {
         es = es.add_entity().with(i);
     }
 
+    es = es.add_entity().with("HI");
+
     println!("HERE");
 
     println!("{}", es.query_with_one::<i32>().as_ref().iter().count());
